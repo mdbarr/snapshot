@@ -1,0 +1,22 @@
+{
+  "name": "@mdbarr/snapshot",
+  "version": "0.1.0",
+  "description": "File System Snapshots in Node.js",
+  "main": "index.js",
+  "repository": "git@github.com:mdbarr/snapshot.git",
+  "author": "Mark Barr <mark@hyperingenuity.com>",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "barrkeep": "^2.3.0",
+    "chokidar": "^3.2.2",
+    "dree": "^2.1.11",
+    "yargs": "^14.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^6.5.1"
+  },
+  "scripts": {
+    "lint": "eslint index.js cli.js"
+  }
+}
