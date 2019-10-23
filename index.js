@@ -1,14 +1,19 @@
 'use strict';
 
 require('barrkeep/pp');
+const fs = require('fs');
 const dree = require('dree');
+const async = require('async');
+const { join } = require('path');
 const chokidar = require('chokidar');
 const utils = require('barrkeep/utils');
 
 function Snapshot ({
-  root = process.cwd(), hidden = false, exclusions = [ 'node_modules' ]
+  root = process.cwd(), directory = join(process.cwd(), '.snapshot'),
+  hidden = false, exclusions = [ 'node_modules' ]
 } = {}) {
   this.root = root;
+  this.directory = directory;
 
   if (Array.isArray(exclusions) && exclusions.length) {
     this.exclude = new RegExp(exclusions.join('|').replace(/[.]/g, '\\.'));
@@ -24,10 +29,46 @@ function Snapshot ({
   };
 
   this.tree = {};
+  this.content = {};
 
-  this.scan = () => {
-    this.tree = dree.scan(this.root, this.options);
-    console.pp(this.tree);
+  this.snapshotFile = (file, callback) => {
+    if (this.content[file.hash]) {
+      setImmediate(callback, null);
+    } else {
+      fs.copyFile(file.path, join(this.directory, file.hash), (error) => {
+        if (error) {
+          return callback(error);
+        }
+        this.content[file.hash] = utils.project(file, {
+          name: 1,
+          extension: 1,
+          type: 1,
+          path: 1,
+          relativePath: 1
+        });
+
+        return callback(null, file);
+      });
+    }
+  };
+
+  this.scan = (callback) => {
+    const files = [];
+    const directories = [];
+
+    this.tree = dree.scan(this.root, this.options,
+      file => { return files.push(file); },
+      dir => { return directories.push(dir); });
+
+    return async.each(files, this.snapshotFile, (error) => {
+      if (error) {
+        return callback(error);
+      }
+
+
+      console.pp(this.content);
+      return callback(null);
+    });
   };
 
   this.watch = () => {
@@ -49,10 +90,17 @@ function Snapshot ({
   this.start = (callback) => {
     callback = utils.callback(callback);
 
-    this.scan();
-    this.watch();
+    fs.mkdir(this.directory, { recursive: true }, (error) => {
+      if (error) {
+        return callback(error);
+      }
 
-    callback(null);
+      this.scan(() => {
+        this.watch();
+
+        return callback(null);
+      });
+    });
   };
 }
 
