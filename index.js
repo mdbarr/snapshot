@@ -10,7 +10,7 @@ const utils = require('barrkeep/utils');
 
 function Snapshot ({
   root = process.cwd(), directory = join(process.cwd(), '.snapshot'),
-  hidden = false, exclusions = [ 'node_modules' ]
+  hidden = false, exclusions = [ 'node_modules', '.git$' ]
 } = {}) {
   this.root = root;
   this.directory = directory;
@@ -22,6 +22,7 @@ function Snapshot ({
   this.options = {
     exclude: this.exclude,
     hash: true,
+    hashAlgorithm: 'sha1',
     normalize: true,
     showHidden: hidden,
     size: true,
@@ -39,12 +40,21 @@ function Snapshot ({
         if (error) {
           return callback(error);
         }
+
         this.content[file.hash] = utils.project(file, {
           name: 1,
           extension: 1,
           type: 1,
           path: 1,
-          relativePath: 1
+          relativePath: 1,
+          'stat.mode': 'mode',
+          'stat.uid': 'uid',
+          'stat.gid': 'gid',
+          'stat.size': 'size',
+          'stat.atime': 'atime',
+          'stat.mtime': 'mtime',
+          'stat.ctime': 'ctime',
+          hash: 1
         });
 
         return callback(null, file);
