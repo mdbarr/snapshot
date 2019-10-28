@@ -30,10 +30,10 @@ function Snapshot ({
   };
 
   this.tree = {};
-  this.content = {};
+  this.objects = {};
 
   this.snapshotFile = (file, callback) => {
-    if (this.content[file.hash]) {
+    if (this.objects[file.hash]) {
       setImmediate(callback, null);
     } else {
       fs.copyFile(file.path, join(this.directory, file.hash), (error) => {
@@ -41,12 +41,12 @@ function Snapshot ({
           return callback(error);
         }
 
-        this.content[file.hash] = utils.project(file, {
+        const projection = utils.project(file, {
           name: 1,
           extension: 1,
           type: 1,
           path: 1,
-          relativePath: 1,
+          relativePath: 'relative',
           'stat.mode': 'mode',
           'stat.uid': 'uid',
           'stat.gid': 'gid',
@@ -57,9 +57,40 @@ function Snapshot ({
           hash: 1
         });
 
-        return callback(null, file);
+        projection.atime = new Date(projection.atime).getTime();
+        projection.mtime = new Date(projection.mtime).getTime();
+        projection.ctime = new Date(projection.ctime).getTime();
+
+        this.objects[file.hash] = projection;
+
+        return callback(null, projection);
       });
     }
+  };
+
+  this.snapshotDirectory = (dir, callback) => {
+    const projection = utils.project(dir, {
+      name: 1,
+      type: 1,
+      path: 1,
+      relativePath: 'relative',
+      'stat.mode': 'mode',
+      'stat.uid': 'uid',
+      'stat.gid': 'gid',
+      'stat.atime': 'atime',
+      'stat.mtime': 'mtime',
+      'stat.ctime': 'ctime'
+    });
+
+    projection.atime = new Date(projection.atime).getTime();
+    projection.mtime = new Date(projection.mtime).getTime();
+    projection.ctime = new Date(projection.ctime).getTime();
+
+    projection.hash = utils.sha1(projection);
+
+    this.objects[projection.hash] = projection;
+
+    return setImmediate(() => { callback(null, projection); });
   };
 
   this.scan = (callback) => {
@@ -70,14 +101,21 @@ function Snapshot ({
       file => { return files.push(file); },
       dir => { return directories.push(dir); });
 
+    console.pp(this.tree);
+
     return async.each(files, this.snapshotFile, (error) => {
       if (error) {
         return callback(error);
       }
 
+      return async.each(directories, this.snapshotDirectory, (error) => {
+        if (error) {
+          return callback(error);
+        }
 
-      console.pp(this.content);
-      return callback(null);
+        console.pp(this.objects);
+        return callback(null);
+      });
     });
   };
 
@@ -100,12 +138,12 @@ function Snapshot ({
   this.start = (callback) => {
     callback = utils.callback(callback);
 
-    fs.mkdir(this.directory, { recursive: true }, (error) => {
+    return fs.mkdir(this.directory, { recursive: true }, (error) => {
       if (error) {
         return callback(error);
       }
 
-      this.scan(() => {
+      return this.scan(() => {
         this.watch();
 
         return callback(null);
