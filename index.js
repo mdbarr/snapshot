@@ -34,42 +34,44 @@ function Snapshot ({
   this.index = {};
 
   this.snapshotFile = (file, callback) => {
-    if (this.index[file.hash]) {
-      setImmediate(callback, null);
-    } else {
-      fs.copyFile(file.path, join(this.directory, file.hash), (error) => {
-        if (error) {
-          return callback(error);
-        }
+    const projection = utils.project(file, {
+      name: 1,
+      extension: 1,
+      type: 1,
+      path: 1,
+      relativePath: 'relative',
+      'stat.mode': 'mode',
+      'stat.uid': 'uid',
+      'stat.gid': 'gid',
+      'stat.size': 'size',
+      'stat.atime': 'atime',
+      'stat.mtime': 'mtime',
+      'stat.ctime': 'ctime',
+      hash: 'content'
+    });
 
-        const projection = utils.project(file, {
-          name: 1,
-          extension: 1,
-          type: 1,
-          path: 1,
-          relativePath: 'relative',
-          'stat.mode': 'mode',
-          'stat.uid': 'uid',
-          'stat.gid': 'gid',
-          'stat.size': 'size',
-          'stat.atime': 'atime',
-          'stat.mtime': 'mtime',
-          'stat.ctime': 'ctime',
-          hash: 1
-        });
+    projection.atime = new Date(projection.atime).getTime();
+    projection.mtime = new Date(projection.mtime).getTime();
+    projection.ctime = new Date(projection.ctime).getTime();
 
-        projection.atime = new Date(projection.atime).getTime();
-        projection.mtime = new Date(projection.mtime).getTime();
-        projection.ctime = new Date(projection.ctime).getTime();
+    const hash = utils.sha1(projection);
 
-        this.index[file.hash] = projection;
-
-        return callback(null, projection);
-      });
+    if (this.index[hash]) {
+      return setImmediate(callback, null, hash);
     }
+
+    return fs.copyFile(file.path, join(this.directory, file.hash), (error) => {
+      if (error) {
+        return callback(error);
+      }
+
+      this.index[hash] = projection;
+
+      return callback(null, hash);
+    });
   };
 
-  this.snapshotDirectory = (dir) => {
+  this.snapshotDirectory = (dir, callback) => {
     const projection = utils.project(dir, {
       name: 1,
       type: 1,
@@ -90,44 +92,45 @@ function Snapshot ({
 
     projection.children = projection.children || null;
 
-    projection.hash = utils.sha1(projection);
+    const hash = utils.sha1(projection);
 
-    this.index[projection.hash] = projection;
+    this.index[hash] = projection;
 
-    return projection;
+    return setImmediate(callback, null, hash);
   };
 
-  this.reduce = (object) => {
-    if (Array.isArray(object.children) && object.children.length) {
-      for (let i = 0; i < object.children.length; i++) {
-        object.children[i] = this.reduce(object.children[i]);
-      }
-    }
-
-    if (object.type === 'directory') {
-      object = this.snapshotDirectory(object);
-    }
-
-    return object.hash;
-  };
-
-  this.scan = (callback) => {
-    const files = [];
-
-    this.tree = dree.scan(this.root, this.options, file => { return files.push(file); });
-
-    console.pp(this.tree);
-
-    return async.each(files, this.snapshotFile, (error) => {
+  this.reduce = (object, callback) => {
+    return async.map(object.children, this.reduce, (error, children) => {
       if (error) {
         return callback(error);
       }
 
-      this.head = this.reduce(this.tree);
+      if (object.type === 'file') {
+        return this.snapshotFile(object, callback);
+      } else if (object.type === 'directory') {
+        object.children = children.sort();
+
+        return this.snapshotDirectory(object, callback);
+      }
+      return callback(new Error(`Unknown object type ${ object.type }`));
+    });
+  };
+
+  this.scan = (callback) => {
+    const scan = dree.scan(this.root, this.options);
+
+    console.pp(scan);
+
+    return this.reduce(scan, (error, head) => {
+      if (error) {
+        return callback(error);
+      }
+
+      this.head = head;
 
       console.pp(this.index);
       console.pp(this.head);
-      return callback(null);
+      return callback(null, this.head);
     });
   };
 
