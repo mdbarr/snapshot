@@ -30,10 +30,11 @@ function Snapshot ({
   };
 
   this.tree = {};
-  this.objects = {};
+  this.head = null;
+  this.index = {};
 
   this.snapshotFile = (file, callback) => {
-    if (this.objects[file.hash]) {
+    if (this.index[file.hash]) {
       setImmediate(callback, null);
     } else {
       fs.copyFile(file.path, join(this.directory, file.hash), (error) => {
@@ -61,14 +62,14 @@ function Snapshot ({
         projection.mtime = new Date(projection.mtime).getTime();
         projection.ctime = new Date(projection.ctime).getTime();
 
-        this.objects[file.hash] = projection;
+        this.index[file.hash] = projection;
 
         return callback(null, projection);
       });
     }
   };
 
-  this.snapshotDirectory = (dir, callback) => {
+  this.snapshotDirectory = (dir) => {
     const projection = utils.project(dir, {
       name: 1,
       type: 1,
@@ -79,27 +80,41 @@ function Snapshot ({
       'stat.gid': 'gid',
       'stat.atime': 'atime',
       'stat.mtime': 'mtime',
-      'stat.ctime': 'ctime'
+      'stat.ctime': 'ctime',
+      children: 1
     });
 
     projection.atime = new Date(projection.atime).getTime();
     projection.mtime = new Date(projection.mtime).getTime();
     projection.ctime = new Date(projection.ctime).getTime();
 
+    projection.children = projection.children || null;
+
     projection.hash = utils.sha1(projection);
 
-    this.objects[projection.hash] = projection;
+    this.index[projection.hash] = projection;
 
-    return setImmediate(() => { callback(null, projection); });
+    return projection;
+  };
+
+  this.reduce = (object) => {
+    if (Array.isArray(object.children) && object.children.length) {
+      for (let i = 0; i < object.children.length; i++) {
+        object.children[i] = this.reduce(object.children[i]);
+      }
+    }
+
+    if (object.type === 'directory') {
+      object = this.snapshotDirectory(object);
+    }
+
+    return object.hash;
   };
 
   this.scan = (callback) => {
     const files = [];
-    const directories = [];
 
-    this.tree = dree.scan(this.root, this.options,
-      file => { return files.push(file); },
-      dir => { return directories.push(dir); });
+    this.tree = dree.scan(this.root, this.options, file => { return files.push(file); });
 
     console.pp(this.tree);
 
@@ -108,14 +123,11 @@ function Snapshot ({
         return callback(error);
       }
 
-      return async.each(directories, this.snapshotDirectory, (error) => {
-        if (error) {
-          return callback(error);
-        }
+      this.head = this.reduce(this.tree);
 
-        console.pp(this.objects);
-        return callback(null);
-      });
+      console.pp(this.index);
+      console.pp(this.head);
+      return callback(null);
     });
   };
 
