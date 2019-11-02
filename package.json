@@ -10,7 +10,7 @@
   "dependencies": {
     "async": "^3.1.0",
     "barrkeep": "^2.3.2",
-    "chokidar": "^3.2.2",
+    "chokidar": "^3.3.0",
     "dree": "^2.1.11",
     "yargs": "^14.2.0"
   },
