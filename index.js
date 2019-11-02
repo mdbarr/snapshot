@@ -60,7 +60,18 @@ function Snapshot ({
           return callback(error);
         }
 
-        return fs.writeFile(fullpath, JSON.stringify(object), (error) => {
+        let data = null;
+        try {
+          data = JSON.stringify(object);
+        } catch (err) {
+          error = err;
+        }
+
+        if (!data) {
+          return callback(error);
+        }
+
+        return fs.writeFile(fullpath, data, (error) => {
           if (error) {
             return callback(error);
           }
