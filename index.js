@@ -10,7 +10,8 @@ const utils = require('barrkeep/utils');
 
 function Snapshot ({
   root = process.cwd(), directory = join(process.cwd(), '.snapshot'),
-  hidden = false, exclusions = [ 'node_modules', '.git$' ]
+  hidden = false, exclusions = [ 'node_modules', '.git$', '.snapshot$' ],
+  absolutePath = false, atime = true, mtime = true, ctime = false
 } = {}) {
   this.root = root;
   this.directory = directory;
@@ -38,21 +39,27 @@ function Snapshot ({
       name: 1,
       extension: 1,
       type: 1,
-      path: 1,
-      relativePath: 'relative',
+      relativePath: 'path',
+      path: absolutePath ? 'absolute' : 0,
       'stat.mode': 'mode',
       'stat.uid': 'uid',
       'stat.gid': 'gid',
       'stat.size': 'size',
-      'stat.atime': 'atime',
-      'stat.mtime': 'mtime',
-      'stat.ctime': 'ctime',
+      'stat.atime': atime ? 'atime' : 0,
+      'stat.mtime': mtime ? 'mtime' : 0,
+      'stat.ctime': ctime ? 'ctime' : 0,
       hash: 'content'
     });
 
-    projection.atime = new Date(projection.atime).getTime();
-    projection.mtime = new Date(projection.mtime).getTime();
-    projection.ctime = new Date(projection.ctime).getTime();
+    if (atime) {
+      projection.atime = new Date(projection.atime).getTime();
+    }
+    if (mtime) {
+      projection.mtime = new Date(projection.mtime).getTime();
+    }
+    if (ctime) {
+      projection.ctime = new Date(projection.ctime).getTime();
+    }
 
     const hash = utils.sha1(projection);
 
@@ -75,20 +82,26 @@ function Snapshot ({
     const projection = utils.project(dir, {
       name: 1,
       type: 1,
-      path: 1,
-      relativePath: 'relative',
+      relativePath: 'path',
+      path: absolutePath ? 'absolute' : 0,
       'stat.mode': 'mode',
       'stat.uid': 'uid',
       'stat.gid': 'gid',
-      'stat.atime': 'atime',
-      'stat.mtime': 'mtime',
-      'stat.ctime': 'ctime',
+      'stat.atime': atime ? 'atime' : 0,
+      'stat.mtime': mtime ? 'mtime' : 0,
+      'stat.ctime': ctime ? 'ctime' : 0,
       children: 1
     });
 
-    projection.atime = new Date(projection.atime).getTime();
-    projection.mtime = new Date(projection.mtime).getTime();
-    projection.ctime = new Date(projection.ctime).getTime();
+    if (atime) {
+      projection.atime = new Date(projection.atime).getTime();
+    }
+    if (mtime) {
+      projection.mtime = new Date(projection.mtime).getTime();
+    }
+    if (ctime) {
+      projection.ctime = new Date(projection.ctime).getTime();
+    }
 
     projection.children = projection.children || null;
 
