@@ -38,6 +38,41 @@ function Snapshot ({
   this.head = null;
   this.index = {};
 
+  this.snapshotObject = (object, callback) => {
+    const hash = utils.sha1(object);
+
+    if (this.index[hash]) {
+      return setImmediate(callback, null, hash);
+    }
+
+    const path = join(this.directories.objects, hash.substring(0, 2));
+    const name = hash.substring(2);
+    const fullpath = join(path, name);
+
+    return fs.stat(fullpath, (error) => {
+      if (!error) {
+        this.index[hash] = object;
+        return callback(null, hash);
+      }
+
+      return fs.mkdir(path, { recursive: true }, (error) => {
+        if (error) {
+          return callback(error);
+        }
+
+        return fs.writeFile(fullpath, JSON.stringify(object), (error) => {
+          if (error) {
+            return callback(error);
+          }
+
+          this.index[hash] = object;
+
+          return callback(null, hash);
+        });
+      });
+    });
+  };
+
   this.snapshotFile = (file, callback) => {
     const projection = utils.project(file, {
       name: 1,
@@ -77,8 +112,7 @@ function Snapshot ({
 
     return fs.stat(fullpath, (error) => {
       if (!error) {
-        this.index[hash] = projection;
-        return callback(null, hash);
+        return this.snapshotObject(projection, callback);
       }
 
       return fs.mkdir(path, { recursive: true }, (error) => {
@@ -91,9 +125,7 @@ function Snapshot ({
             return callback(error);
           }
 
-          this.index[hash] = projection;
-
-          return callback(null, hash);
+          return this.snapshotObject(projection, callback);
         });
       });
     });
@@ -126,11 +158,7 @@ function Snapshot ({
 
     projection.children = projection.children || null;
 
-    const hash = utils.sha1(projection);
-
-    this.index[hash] = projection;
-
-    return setImmediate(callback, null, hash);
+    return this.snapshotObject(projection, callback);
   };
 
   this.reduce = (object, callback) => {
