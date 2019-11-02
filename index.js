@@ -15,6 +15,10 @@ function Snapshot ({
 } = {}) {
   this.root = root;
   this.directory = directory;
+  this.directories = {
+    snapshot: this.directory,
+    objects: join(directory, 'objects')
+  };
 
   if (Array.isArray(exclusions) && exclusions.length) {
     this.exclude = new RegExp(exclusions.join('|').replace(/[.]/g, '\\.'));
@@ -67,14 +71,31 @@ function Snapshot ({
       return setImmediate(callback, null, hash);
     }
 
-    return fs.copyFile(file.path, join(this.directory, file.hash), (error) => {
-      if (error) {
-        return callback(error);
+    const path = join(this.directories.objects, file.hash.substring(0, 2));
+    const name = file.hash.substring(2);
+    const fullpath = join(path, name);
+
+    return fs.stat(fullpath, (error) => {
+      if (!error) {
+        this.index[hash] = projection;
+        return callback(null, hash);
       }
 
-      this.index[hash] = projection;
+      return fs.mkdir(path, { recursive: true }, (error) => {
+        if (error) {
+          return callback(error);
+        }
 
-      return callback(null, hash);
+        return fs.copyFile(file.path, fullpath, (error) => {
+          if (error) {
+            return callback(error);
+          }
+
+          this.index[hash] = projection;
+
+          return callback(null, hash);
+        });
+      });
     });
   };
 
