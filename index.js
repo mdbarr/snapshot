@@ -17,7 +17,8 @@ function Snapshot ({
   this.directory = directory;
   this.directories = {
     snapshot: this.directory,
-    objects: join(directory, 'objects')
+    objects: join(directory, 'objects'),
+    refs: join(directory, 'refs')
   };
 
   if (Array.isArray(exclusions) && exclusions.length) {
@@ -172,6 +173,24 @@ function Snapshot ({
     return this.snapshotObject(projection, callback);
   };
 
+  this.saveRef = (name, ref, callback) => {
+    return fs.mkdir(this.directories.refs, { recursive: true }, (error) => {
+      if (error) {
+        return callback(error);
+      }
+
+      const fullpath = join(this.directories.refs, name);
+
+      return fs.writeFile(fullpath, ref, (error) => {
+        if (error) {
+          return callback(error);
+        }
+
+        return callback(null);
+      });
+    });
+  };
+
   this.reduce = (object, callback) => {
     return async.map(object.children, this.reduce, (error, children) => {
       if (error) {
@@ -201,9 +220,15 @@ function Snapshot ({
 
       this.head = head;
 
-      console.pp(this.index);
-      console.pp(this.head);
-      return callback(null, this.head);
+      return this.saveRef('HEAD', this.head, (error) => {
+        if (error) {
+          return callback(error);
+        }
+
+        console.pp(this.index);
+        console.pp(this.head);
+        return callback(null, this.head);
+      });
     });
   };
 
