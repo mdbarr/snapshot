@@ -11,14 +11,14 @@ const utils = require('barrkeep/utils');
 function Snapshot ({
   root = process.cwd(), directory = join(process.cwd(), '.snapshot'),
   hidden = false, exclusions = [ 'node_modules', '.git$', '.snapshot$' ],
-  absolutePath = false, atime = true, mtime = true, ctime = false
+  absolutePath = false, atime = true, mtime = true, ctime = false,
 } = {}) {
   this.root = root;
   this.directory = directory;
   this.directories = {
     snapshot: this.directory,
     objects: join(directory, 'objects'),
-    refs: join(directory, 'refs')
+    refs: join(directory, 'refs'),
   };
 
   if (Array.isArray(exclusions) && exclusions.length) {
@@ -32,7 +32,7 @@ function Snapshot ({
     normalize: true,
     showHidden: hidden,
     size: true,
-    stat: true
+    stat: true,
   };
 
   this.tree = {};
@@ -99,7 +99,7 @@ function Snapshot ({
       'stat.atime': atime ? 'atime' : 0,
       'stat.mtime': mtime ? 'mtime' : 0,
       'stat.ctime': ctime ? 'ctime' : 0,
-      hash: 'content'
+      hash: 'content',
     });
 
     if (atime) {
@@ -155,7 +155,7 @@ function Snapshot ({
       'stat.atime': atime ? 'atime' : 0,
       'stat.mtime': mtime ? 'mtime' : 0,
       'stat.ctime': ctime ? 'ctime' : 0,
-      children: 1
+      children: 1,
     });
 
     if (atime) {
@@ -173,40 +173,36 @@ function Snapshot ({
     return this.snapshotObject(projection, callback);
   };
 
-  this.saveRef = (name, ref, callback) => {
-    return fs.mkdir(this.directories.refs, { recursive: true }, (error) => {
+  this.saveRef = (name, ref, callback) => fs.mkdir(this.directories.refs, { recursive: true }, (error) => {
+    if (error) {
+      return callback(error);
+    }
+
+    const fullpath = join(this.directories.refs, name);
+
+    return fs.writeFile(fullpath, ref, (error) => {
       if (error) {
         return callback(error);
       }
 
-      const fullpath = join(this.directories.refs, name);
-
-      return fs.writeFile(fullpath, ref, (error) => {
-        if (error) {
-          return callback(error);
-        }
-
-        return callback(null);
-      });
+      return callback(null);
     });
-  };
+  });
 
-  this.reduce = (object, callback) => {
-    return async.map(object.children, this.reduce, (error, children) => {
-      if (error) {
-        return callback(error);
-      }
+  this.reduce = (object, callback) => async.map(object.children, this.reduce, (error, children) => {
+    if (error) {
+      return callback(error);
+    }
 
-      if (object.type === 'file') {
-        return this.snapshotFile(object, callback);
-      } else if (object.type === 'directory') {
-        object.children = children.sort();
+    if (object.type === 'file') {
+      return this.snapshotFile(object, callback);
+    } else if (object.type === 'directory') {
+      object.children = children.sort();
 
-        return this.snapshotDirectory(object, callback);
-      }
-      return callback(new Error(`Unknown object type ${ object.type }`));
-    });
-  };
+      return this.snapshotDirectory(object, callback);
+    }
+    return callback(new Error(`Unknown object type ${ object.type }`));
+  });
 
   this.scan = (callback) => {
     const scan = dree.scan(this.root, this.options);
@@ -240,7 +236,7 @@ function Snapshot ({
     this.watcher = chokidar.watch(this.root, {
       persistent: true,
       ignoreInitial: true,
-      ignored: this.exclude
+      ignored: this.exclude,
     });
 
     this.watcher.on('all', (type, filename) => {
