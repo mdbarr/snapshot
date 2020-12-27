@@ -9,13 +9,13 @@
   "private": false,
   "dependencies": {
     "async": "^3.2.0",
-    "barrkeep": "^2.6.6",
-    "chokidar": "^3.4.2",
-    "dree": "^2.4.15",
-    "yargs": "^15.4.1"
+    "barrkeep": "^2.8.0",
+    "chokidar": "^3.4.3",
+    "dree": "^2.5.3",
+    "yargs": "^16.2.0"
   },
   "devDependencies": {
-    "eslint": "^7.8.1"
+    "eslint": "^7.16.0"
   },
   "scripts": {
     "lint": "eslint index.js cli.js"
